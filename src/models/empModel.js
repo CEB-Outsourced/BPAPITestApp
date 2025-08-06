@@ -2,7 +2,7 @@ import pool from '../config/db.js';
 
 // Get all users with full joined details
 const getAllUsersWithFullDetails = async () => {
-  const [rows] = await pool.query(`
+  const result = await pool.query(`
     SELECT 
       u.EmpPF_No,
       u.EmpName_Title,
@@ -21,12 +21,12 @@ const getAllUsersWithFullDetails = async () => {
     LEFT JOIN baranchprovi_master bp ON u.BraProvi_Code = bp.BraProvi_Code
     LEFT JOIN unit_master um ON u.Unit_Code = um.Unit_Code
   `);
-  return rows;
+  return result.rows;
 };
 
 // Get one user full details by EPF
 const getUserFullDetails = async (epf) => {
-  const [rows] = await pool.query(`
+  const result = await pool.query(`
     SELECT 
       u.EmpPF_No,
       u.EmpName_Title,
@@ -44,9 +44,9 @@ const getUserFullDetails = async (epf) => {
     LEFT JOIN division_master dm ON u.Divi_Code = dm.Divi_Code
     LEFT JOIN baranchprovi_master bp ON u.BraProvi_Code = bp.BraProvi_Code
     LEFT JOIN unit_master um ON u.Unit_Code = um.Unit_Code
-    WHERE u.EmpPF_No = ?
+    WHERE u.EmpPF_No = $1
   `, [epf]);
-  return rows[0];
+  return result.rows[0];
 };
 
 // Create a new user
@@ -63,10 +63,11 @@ const createUser = async (
   BraProvi_Code,
   Unit_Code
 ) => {
-  const [result] = await pool.query(`
+  const result = await pool.query(`
     INSERT INTO emp_master 
       (EmpPF_No, EmpName_Title, Full_Name, Mobile_No, Office_No, E_Mail, Desig_Code, Post, Divi_Code, BraProvi_Code, Unit_Code)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    RETURNING *
   `, [
     EmpPF_No,
     EmpName_Title,
@@ -80,24 +81,25 @@ const createUser = async (
     BraProvi_Code,
     Unit_Code
   ]);
-  return result.insertId;
+  return result.rows[0];
 };
 
 // Update user by PF
 const updateUser = async (epf, updatedData) => {
-  const fields = Object.keys(updatedData).map(key => `${key} = ?`).join(', ');
+  const keys = Object.keys(updatedData);
   const values = Object.values(updatedData);
-  const [result] = await pool.query(
-    `UPDATE emp_master SET ${fields} WHERE EmpPF_No = ?`,
+  const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
+  const result = await pool.query(
+    `UPDATE emp_master SET ${setClause} WHERE EmpPF_No = $${keys.length + 1}`,
     [...values, epf]
   );
-  return result.affectedRows;
+  return result.rowCount;
 };
 
 // Delete user by PF
 const deleteUser = async (epf) => {
-  const [result] = await pool.query(`DELETE FROM emp_master WHERE EmpPF_No = ?`, [epf]);
-  return result.affectedRows;
+  const result = await pool.query(`DELETE FROM emp_master WHERE EmpPF_No = $1`, [epf]);
+  return result.rowCount;
 };
 
 export {
